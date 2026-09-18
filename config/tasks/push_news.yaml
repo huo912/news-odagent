@@ -1,0 +1,11 @@
+# 推送新闻任务
+description: >
+  接收评论分析员的舆情分析结果。
+  将最终结果格式化为推送内容，支持 Markdown/JSON/纯文本三种格式。
+  使用文件读写 + 代码执行工具，将推送内容发送到新闻来源的渠道。
+  确保内容简洁、可读性强。
+expected_output: >
+  推送完成确认，包含推送格式、推送渠道、推送内容预览。
+agent: push_specialist
+context:
+  - analyze_comments

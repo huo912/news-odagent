@@ -1,0 +1,13 @@
+# 热度排序任务
+description: >
+  接收内容整合员输出的跨平台新闻池。
+  综合多平台热度指标（阅读量/评论数/讨论量/时间衰减），
+  使用 Python 代码执行 + 计算工具计算统一热度分。
+  时间衰减：越新的新闻热度权重越高。
+  筛选出全平台热度最高的 Top 3 新闻。
+expected_output: >
+  一个包含 Top 3 新闻的 JSON 数组，每条包含统一热度分 heat_score，
+  并按热度分从高到低排序。
+agent: heat_ranker
+context:
+  - integrate_content

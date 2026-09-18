@@ -1,0 +1,25 @@
+[project]
+name = "news-odagent"
+version = "0.1.0"
+description = "基于 CrewAI 的多 Agent 新闻采集、处理与推送团队"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "crewai>=0.80.0",
+    "crewai-tools>=0.20.0",
+    "pyyaml>=6.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "python-dotenv>=1.0.0",
+    "textblob>=0.17.1",
+]
+
+[project.scripts]
+news-crew = "news_crew.main:run"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

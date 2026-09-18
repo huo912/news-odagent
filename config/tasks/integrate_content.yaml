@@ -1,0 +1,17 @@
+# 整合跨平台内容任务
+description: >
+  接收三个采集员（今日头条、微博、知乎）的输出结果。
+  执行以下操作：
+  1. 去重：根据标题/话题相似度去除跨平台重复项
+  2. 合并：将不同平台的数据统一为统一格式
+  3. 标准化：统一字段命名、数值单位、时间格式
+  使用 Python 代码执行工具完成数据清洗。
+  最终输出跨平台新闻池（JSON 数组）。
+expected_output: >
+  一个去重、合并、标准化后的跨平台新闻池 JSON 数组，
+  每条记录包含统一字段：platform, title, source, heat_metrics, publish_time, url。
+agent: content_integrator
+context:
+  - collect_toutiao
+  - collect_weibo
+  - collect_zhihu

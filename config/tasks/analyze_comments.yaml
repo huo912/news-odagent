@@ -1,0 +1,16 @@
+# 舆情评论分析任务
+description: >
+  接收热度排序员输出的 Top 3 新闻。
+  对每条新闻进行舆情分析：
+  1. 使用搜索工具搜索网友评论
+  2. 使用情感分析工具提取正面/负面/中立情绪
+  3. 总结核心观点
+  4. 识别争议点
+  保持客观中立，理解多方观点。
+expected_output: >
+  一个包含 Top 3 新闻舆情分析的 JSON 数组，每条包含：
+  title, sentiment_summary, positive_points, negative_points, neutral_points,
+  core_views, controversy_points。
+agent: comment_analyst
+context:
+  - rank_by_heat

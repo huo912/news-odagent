@@ -1,0 +1,11 @@
+# 采集微博热搜任务
+description: >
+  搜索微博热搜榜，抓取 Top 10 话题。对每个话题提取：
+  热度值、讨论量、阅读量、发布时间。
+  使用搜索工具定位热搜榜页面，再提取结构化数据。
+  将结果以 JSON 数组形式输出，字段为：
+  topic, heat_value, discussion_count, read_count, publish_time, url
+expected_output: >
+  一个包含 10 个话题的 JSON 数组，每条包含
+  topic, heat_value, discussion_count, read_count, publish_time, url 字段。
+agent: weibo_collector

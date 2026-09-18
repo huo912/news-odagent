@@ -1,0 +1,11 @@
+# 采集今日头条热榜任务
+description: >
+  搜索今日头条热榜，抓取 Top 10 新闻。对每条新闻提取：
+  标题、来源、阅读量、评论数、发布时间。
+  使用搜索工具定位热榜页面，再用网页抓取工具提取结构化数据。
+  将结果以 JSON 数组形式输出，字段为：
+  title, source, read_count, comment_count, publish_time, url
+expected_output: >
+  一个包含 10 条新闻的 JSON 数组，每条包含
+  title, source, read_count, comment_count, publish_time, url 字段。
+agent: toutiao_collector
