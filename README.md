@@ -82,7 +82,7 @@ news-odagent/
 # 1. 创建虚拟环境（需 Python 3.10-3.12）
 python -m venv .venv
 # Windows
-.venv\Scripts\activate
+source .venv/Scripts/activate
 # macOS/Linux
 source .venv/bin/activate
 

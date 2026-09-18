@@ -42,16 +42,30 @@ Requires-Dist: textblob>=0.17.1
 
 - **每个 agent 独立成文件**：`src/news_crew/agents/*.py`，代码互不混合
 - **共享工具层**：`src/news_crew/tools/*.py`，每个工具独立文件
-- **YAML 配置**：`config/agents.yaml` 和 `config/tasks.yaml` 定义角色与任务
-- **编排层**：`src/news_crew/crew.py` 从 YAML 加载并组装 Crew
+- **YAML 配置**：`config/agents/*.yaml` 和 `config/tasks/*.yaml`，每个 agent / task 一个独立文件
+- **编排层**：`src/news_crew/crew.py` 遍历目录加载 YAML 并组装 Crew
 
 ## 目录结构
 
 ```
 news-odagent/
 ├── config/
-│   ├── agents.yaml          # Agent 角色/目标/背景配置
-│   └── tasks.yaml           # 任务描述/输出/依赖配置
+│   ├── agents/              # 每个 agent 一个独立 YAML 文件
+│   │   ├── toutiao_collector.yaml
+│   │   ├── weibo_collector.yaml
+│   │   ├── zhihu_collector.yaml
+│   │   ├── content_integrator.yaml
+│   │   ├── heat_ranker.yaml
+│   │   ├── comment_analyst.yaml
+│   │   └── push_specialist.yaml
+│   └── tasks/               # 每个 task 一个独立 YAML 文件
+│       ├── collect_toutiao.yaml
+│       ├── collect_weibo.yaml
+│       ├── collect_zhihu.yaml
+│       ├── integrate_content.yaml
+│       ├── rank_by_heat.yaml
+│       ├── analyze_comments.yaml
+│       └── push_news.yaml
 ├── src/news_crew/
 │   ├── agents/              # 7 个 agent，各自独立文件
 │   │   ├── toutiao_collector.py
@@ -82,7 +96,7 @@ news-odagent/
 # 1. 创建虚拟环境（需 Python 3.10-3.12）
 python -m venv .venv
 # Windows
-.venv\Scripts\activate
+source .venv/Scripts/activate
 # macOS/Linux
 source .venv/bin/activate
 
