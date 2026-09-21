@@ -1,9 +1,37 @@
 # 推送新闻任务
 description: >
-  接收评论分析员的舆情分析结果。
+  接收评论分析员的舆情分析结果（含新闻内容摘要 summary 和自己的评论 own_comment）。
   将最终结果格式化为推送内容，支持 Markdown/JSON/纯文本三种格式。
   使用文件读写 + 代码执行工具，将推送内容发送到新闻来源的渠道。
   确保内容简洁、可读性强。
+  重要：
+  1. 每条新闻必须包含完整的新闻内容（title + summary）和评论分析员撰写的
+     自己的评论（own_comment），这是本次推送的核心内容。
+  2. 严禁输出"（待上游提供）"等占位符。若上游某字段缺失，
+     用空字符串或 null 代替，并在 note 中说明缺失原因。
+  3. 推送的 JSON 结构固定为：
+     {
+       "type": "news_sentiment_top3",
+       "generated_at": "YYYY-MM-DD HH:MM",
+       "channel": "file",
+       "note": "可选，说明数据缺失或异常情况",
+       "items": [
+         {
+           "rank": 1,
+           "source": "平台名",
+           "heat_score": 数值或 null,
+           "title": "新闻标题",
+           "summary": "新闻内容摘要",
+           "sentiment_summary": "舆情总结",
+           "positive_points": [],
+           "negative_points": [],
+           "neutral_points": [],
+           "core_views": "核心观点",
+           "controversy_points": [],
+           "own_comment": "评论分析员撰写的自己的评论"
+         }
+       ]
+     }
 expected_output: >
   推送完成确认，包含推送格式、推送渠道、推送内容预览。
 agent: push_specialist

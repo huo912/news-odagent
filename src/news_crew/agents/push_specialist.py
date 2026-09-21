@@ -18,4 +18,5 @@ def create_push_specialist(llm, cfg: dict) -> Agent:
         llm=llm,
         allow_delegation=cfg.get("allow_delegation", False),
         verbose=cfg.get("verbose", True),
+        max_iter=cfg.get("max_iter", 25),
     )

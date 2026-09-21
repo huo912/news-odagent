@@ -1,16 +1,20 @@
 # 舆情评论分析任务
 description: >
-  接收热度排序员输出的 Top 3 新闻。
+  接收热度排序员输出的 Top 3 新闻（含新闻内容摘要 summary）。
   对每条新闻进行舆情分析：
-  1. 使用搜索工具搜索网友评论
+  1. 使用搜索工具搜索该新闻的网友评论
   2. 使用情感分析工具提取正面/负面/中立情绪
   3. 总结核心观点
   4. 识别争议点
+  5. 基于新闻内容和网友评论，以独立评论者的身份撰写一段自己的评论（own_comment）：
+     要求观点鲜明、有理有据，可引用评论中的具体观点作为论据，
+     长度 100-200 字，禁止空话套话。
   保持客观中立，理解多方观点。
+  重要：title 和 summary 必须原样来自上游输入，禁止使用占位符。
 expected_output: >
   一个包含 Top 3 新闻舆情分析的 JSON 数组，每条包含：
-  title, sentiment_summary, positive_points, negative_points, neutral_points,
-  core_views, controversy_points。
+  title, summary, sentiment_summary, positive_points, negative_points, neutral_points,
+  core_views, controversy_points, own_comment。
 agent: comment_analyst
 context:
   - rank_by_heat

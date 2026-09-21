@@ -8,3 +8,12 @@ backstory: >
   你熟悉微博热搜的排序逻辑，能准确抓取每个话题的热度指标。
 allow_delegation: false
 verbose: true
+# 最大迭代次数（默认 25）；若该 agent 频繁出现 "Maximum iterations reached"，取消注释并调大
+# max_iter: 50
+# 该 agent 专属模型配置（不配置则使用 .env 中的默认模型）
+# llm:
+#   model: qwen3.8-27b
+#   # api_key: sk-xxx
+#   # base_url: http://10.105.1.5:4001/v1
+#   # reasoning_effort: low
+#   # timeout: 600

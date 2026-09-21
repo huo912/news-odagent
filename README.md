@@ -116,6 +116,33 @@ news-crew
 
 ## 输出
 
-- 采集结果：各平台 Top 10
-- 处理结果：跨平台新闻池 + 全平台 Top 3
-- 输出结果：舆情分析 + 推送内容（Markdown/JSON/纯文本）
+- 采集结果：各平台 Top 10（含新闻内容摘要 summary）
+- 处理结果：跨平台新闻池 + 全平台 Top 3（保留 summary）
+- 输出结果：舆情分析 + 评论分析员撰写的自己的评论（own_comment）+ 推送内容（Markdown/JSON/纯文本）
+
+推送 JSON 结构（`output/push_result.txt`）：
+
+```json
+{
+  "type": "news_sentiment_top3",
+  "generated_at": "YYYY-MM-DD HH:MM",
+  "channel": "file",
+  "note": "可选，说明数据缺失或异常情况",
+  "items": [
+    {
+      "rank": 1,
+      "source": "平台名",
+      "heat_score": 12345,
+      "title": "新闻标题",
+      "summary": "新闻内容摘要",
+      "sentiment_summary": "舆情总结",
+      "positive_points": [],
+      "negative_points": [],
+      "neutral_points": [],
+      "core_views": "核心观点",
+      "controversy_points": [],
+      "own_comment": "评论分析员撰写的自己的评论"
+    }
+  ]
+}
+```

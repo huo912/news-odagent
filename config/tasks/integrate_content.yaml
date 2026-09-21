@@ -7,9 +7,10 @@ description: >
   3. 标准化：统一字段命名、数值单位、时间格式
   使用 Python 代码执行工具完成数据清洗。
   最终输出跨平台新闻池（JSON 数组）。
+  注意：summary（新闻内容摘要）字段必须原样保留，不得丢弃或置空。
 expected_output: >
   一个去重、合并、标准化后的跨平台新闻池 JSON 数组，
-  每条记录包含统一字段：platform, title, source, heat_metrics, publish_time, url。
+  每条记录包含统一字段：platform, title, source, summary, heat_metrics, publish_time, url。
 agent: content_integrator
 context:
   - collect_toutiao
