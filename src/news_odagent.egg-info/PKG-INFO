@@ -11,6 +11,8 @@ Requires-Dist: requests>=2.31.0
 Requires-Dist: beautifulsoup4>=4.12.0
 Requires-Dist: python-dotenv>=1.0.0
 Requires-Dist: textblob>=0.17.1
+Provides-Extra: nacos
+Requires-Dist: nacos-sdk-python>=1.0.0; extra == "nacos"
 
 # 新闻团队（News Crew）
 
@@ -82,6 +84,7 @@ news-odagent/
 │   │   ├── sentiment_tool.py# 情感分析
 │   │   └── file_tool.py     # 文件读写/推送
 │   ├── crew.py              # Crew 编排（加载 YAML）
+│   ├── nacos_config.py      # Nacos 远程模型配置（可选）
 │   └── main.py              # 入口
 ├── .env.example
 ├── pyproject.toml
@@ -111,10 +114,136 @@ cp .env.example .env
 ## 运行
 
 ```bash
+# 启动全部 agent（默认）
 python -m news_crew.main
 # 或
 news-crew
+
+# 动态指定启动哪些 agent（空格分隔，可多个）
+python -m news_crew.main --agents toutiao_collector weibo_collector
+news-crew --agents content_integrator heat_ranker
+
+# 列出所有可用 agent
+python -m news_crew.main --list-agents
 ```
+
+### 动态 Agent 选择规则
+
+- `--agents` 不指定时启动全部 7 个 agent（默认行为）。
+- 只创建所选 agent；**未启动 agent 对应的任务自动跳过**。
+- 下游任务依赖上游任务的输出（`context`）：
+  - **部分上游可用** → 用可用上游继续执行，`context` 自动裁剪；
+  - **全部上游被跳过** → 没有输入数据，下游任务一并跳过。
+  - 跳过的任务会打印 `[跳过任务]` 提示。
+- 所选 agent 没有任何可执行任务时（例如只启动下游 agent 而未启动上游），
+  会报错并列出被跳过的任务及原因。
+
+示例：
+
+| 命令                                                        | 实际执行的任务                                                                         |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `--agents toutiao_collector weibo_collector`                | 今日头条采集、微博采集                                                                 |
+| `--agents toutiao_collector content_integrator heat_ranker` | 今日头条采集 → 内容整合 → 热度排序（微博/知乎采集被跳过，整合任务的 context 自动裁剪） |
+| `--agents heat_ranker`                                      | 报错：上游采集/整合 agent 未启动，无可执行任务                                         |
+
+## 断点续跑（Checkpoint）与跨会话记忆（Memory）
+
+所有 agent 和 Crew 均已启用 `checkpoint=True` 和 `memory=True`：
+
+- **Checkpoint 断点续跑**：每个任务完成后，Crew 运行时状态（含各任务输出）
+  自动保存到 `./.checkpoints/main/{时间戳}_{id}.json`。运行中断（网络异常、
+  手动 Ctrl+C 等）后可从断点恢复，**已完成的任务不会重跑**。
+- **Memory 跨会话记忆**：上下文保存到 `.crewai/`（LanceDB 向量存储），
+  跨会话保持记忆。
+
+### 用法
+
+```bash
+# 列出所有 checkpoint（按时间从旧到新，最新在最后）
+python -m news_crew.main --list-checkpoints
+
+# 从最新 checkpoint 断点续跑（自动跳过已完成任务）
+python -m news_crew.main --resume
+
+# 从指定 checkpoint 文件恢复
+python -m news_crew.main --resume .checkpoints/main/20260922_123456_ab12cd34_p-xxx.json
+```
+
+### 代码调用
+
+```python
+from crewai import Crew
+from crewai.state.checkpoint_config import CheckpointConfig
+
+config = CheckpointConfig(restore_from=".checkpoints/main/xxx.json")
+crew = Crew.from_checkpoint(config)
+result = crew.kickoff()   # 从最后一个已完成的任务之后继续
+```
+
+### 注意事项
+
+- 需要先**正常运行一次**产生 checkpoint 后才能续跑（`--list-checkpoints`
+  可查看是否已有 checkpoint）。
+- 恢复时 agent 配置（YAML）最好与保存时一致，否则可能出现任务对不上的情况。
+- `.checkpoints/` 和 `.crewai/` 是运行时状态目录，建议加入 `.gitignore`。
+
+## 远程模型配置（Nacos，可选）
+
+Agent 使用的模型支持通过 **Nacos 配置中心**远程指定。未配置 Nacos 时，
+行为与原来完全一致（agent YAML 的 `llm` 段 > `.env` 环境变量）。
+
+### 启用步骤
+
+```bash
+# 1. 安装 Nacos SDK（可选依赖）
+pip install -e ".[nacos]"
+
+# 2. 在 .env 中配置 Nacos 连接信息
+NACOS_SERVER_ADDR=127.0.0.1:8848
+NACOS_NAMESPACE=            # 命名空间 ID，留空为 public
+NACOS_GROUP=DEFAULT_GROUP
+NACOS_DATA_ID=news-crew-llm.yaml
+# NACOS_USERNAME=           # 需要鉴权时填写
+# NACOS_PASSWORD=
+# NACOS_TIMEOUT_MS=10000    # Nacos 请求超时（毫秒）
+```
+
+### Nacos 配置内容
+
+在 Nacos 控制台创建配置（dataId 默认 `news-crew-llm.yaml`，分组默认
+`DEFAULT_GROUP`），内容支持 YAML 或 JSON：
+
+```yaml
+# 全局默认（作用于所有 agent）
+default:
+  model: qwen3.8-27b
+  # api_key: sk-xxx
+  # base_url: http://10.105.1.5:4001/v1
+  # reasoning_effort: low
+  # timeout: 600
+
+# 按 agent 覆盖（key 为 agent 名）
+agents:
+  toutiao_collector:
+    model: gpt-4o
+```
+
+### 模型配置优先级（高 → 低）
+
+1. Nacos `agents.<agent_key>`（按 agent 覆盖）
+2. Nacos `default`（全局默认）
+3. agent YAML 中的 `llm` 段
+4. `.env` 环境变量（`OPENAI_MODEL_NAME` 等）
+
+说明：
+
+- **热更新**：首次拉取后，后台线程持续监听 Nacos 配置变更。在 Nacos
+  控制台修改配置并发布后，进程内缓存自动刷新，**下一次创建 agent LLM
+  时即使用新模型，无需重启进程**（已运行的 agent 保持原模型，直到
+  其任务结束、Crew 重新构建）。
+- 首次拉取失败（网络异常、配置格式错误等）会打印警告并自动回退到本地
+  配置，不阻断启动；后续配置变更仍会尝试热更新。
+- 未设置 `NACOS_SERVER_ADDR` 时不会连接 Nacos，也无需安装 SDK。
 
 ## 各 Agent 说明
 
@@ -130,6 +259,33 @@ news-crew
 
 ## 输出
 
-- 采集结果：各平台 Top 10
-- 处理结果：跨平台新闻池 + 全平台 Top 3
-- 输出结果：舆情分析 + 推送内容（Markdown/JSON/纯文本）
+- 采集结果：各平台 Top 10（含新闻内容摘要 summary）
+- 处理结果：跨平台新闻池 + 全平台 Top 3（保留 summary）
+- 输出结果：舆情分析 + 评论分析员撰写的自己的评论（own_comment）+ 推送内容（Markdown/JSON/纯文本）
+
+推送 JSON 结构（`output/push_result.txt`）：
+
+```json
+{
+  "type": "news_sentiment_top3",
+  "generated_at": "YYYY-MM-DD HH:MM",
+  "channel": "file",
+  "note": "可选，说明数据缺失或异常情况",
+  "items": [
+    {
+      "rank": 1,
+      "source": "平台名",
+      "heat_score": 12345,
+      "title": "新闻标题",
+      "summary": "新闻内容摘要",
+      "sentiment_summary": "舆情总结",
+      "positive_points": [],
+      "negative_points": [],
+      "neutral_points": [],
+      "core_views": "核心观点",
+      "controversy_points": [],
+      "own_comment": "评论分析员撰写的自己的评论"
+    }
+  ]
+}
+```

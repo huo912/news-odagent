@@ -3,6 +3,7 @@ pyproject.toml
 src/news_crew/__init__.py
 src/news_crew/crew.py
 src/news_crew/main.py
+src/news_crew/nacos_config.py
 src/news_crew/agents/__init__.py
 src/news_crew/agents/comment_analyst.py
 src/news_crew/agents/content_integrator.py

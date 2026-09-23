@@ -1,1 +1,7 @@
 .venv/
+
+# CrewAI 运行时状态（checkpoint 断点续跑 + 跨会话记忆）
+.checkpoints/
+.crewai/
+src/news_crew/__pycache__/
+output/

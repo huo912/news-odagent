@@ -1,2 +1,2 @@
 [console_scripts]
-news-crew = news_crew.main:run
+news-crew = news_crew.main:main

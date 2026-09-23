@@ -18,4 +18,7 @@ def create_weibo_collector(llm, cfg: dict) -> Agent:
         allow_delegation=cfg.get("allow_delegation", False),
         verbose=cfg.get("verbose", True),
         max_iter=cfg.get("max_iter", 25),
+        checkpoint=True,
+        # memory 需要 embedding 模型，当前网关不支持，故关闭
+        memory=False,
     )

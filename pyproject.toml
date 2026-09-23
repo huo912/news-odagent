@@ -14,8 +14,12 @@ dependencies = [
     "textblob>=0.17.1",
 ]
 
+[project.optional-dependencies]
+# 启用 Nacos 远程模型配置时需要：pip install -e ".[nacos]"
+nacos = ["nacos-sdk-python>=1.0.0"]
+
 [project.scripts]
-news-crew = "news_crew.main:run"
+news-crew = "news_crew.main:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
