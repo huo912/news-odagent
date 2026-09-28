@@ -8,6 +8,7 @@
     （跳过已完成任务）；`--list-checkpoints` 查看历史 checkpoint，
     `--resume <文件>` 可指定从某个 checkpoint 恢复。
 """
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -63,6 +64,26 @@ def load_yaml_dir(dirname: str) -> dict:
         with open(file, "r", encoding="utf-8") as f:
             configs[key] = yaml.safe_load(f)
     return configs
+
+
+def _with_date_context(description: str) -> str:
+    """
+    在任务描述前注入当前日期上下文。
+
+    原因：LLM 不知道"今天"是哪天。不注入日期时，强模型（如 qwen3.8-27b）
+    能自行推断出当前日期并构造带时效性的搜索词，而弱模型（如 r1:7b）
+    会回退到训练数据（cutoff 较早），构造出模糊的搜索词甚至用旧记忆
+    填充结果，导致"老模型查出的新闻是旧的"。注入真实日期后，所有模型
+    都基于正确的"今天"去搜索和判断时效性。
+    """
+    now = datetime.now()
+    date_line = (
+        f"【当前日期】今天是 {now.strftime('%Y-%m-%d')}。"
+        f"搜索和判断新闻时效性时必须以此日期为准，"
+        f"优先查找该日期前后 1-2 天内的最新内容，"
+        f"禁止使用训练记忆中的旧闻充当今日新闻。\n\n"
+    )
+    return date_line + description
 
 
 def get_llm(agent_cfg: dict | None = None, agent_key: str | None = None):
@@ -182,7 +203,7 @@ def build_crew(agents: list[str] | None = None) -> Crew:
         cfg = tasks_config[key]
         agent_key = cfg["agent"]
         task = Task(
-            description=cfg["description"],
+            description=_with_date_context(cfg["description"]),
             expected_output=cfg["expected_output"],
             agent=agents[agent_key],
             context=[make_task(c) for c in cfg.get("context", []) if c in active],

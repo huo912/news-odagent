@@ -1,10 +1,11 @@
 """
 知乎热榜采集员 Agent
 开放性高，关注深度讨论，擅长识别争议性话题。
-使用搜索工具。
+使用搜索工具 + 网页抓取工具。
 """
 from crewai import Agent
 from ..tools.search_tool import web_search
+from ..tools.scrape_tool import web_scrape
 
 
 def create_zhihu_collector(llm, cfg: dict) -> Agent:
@@ -13,7 +14,7 @@ def create_zhihu_collector(llm, cfg: dict) -> Agent:
         role=cfg["role"],
         goal=cfg["goal"],
         backstory=cfg["backstory"],
-        tools=[web_search],
+        tools=[web_search, web_scrape],
         llm=llm,
         allow_delegation=cfg.get("allow_delegation", False),
         verbose=cfg.get("verbose", True),

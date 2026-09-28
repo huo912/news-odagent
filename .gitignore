@@ -5,3 +5,6 @@
 .crewai/
 src/news_crew/__pycache__/
 output/
+src/news_crew/agents/__pycache__/
+.env
+src/news_crew/tools/__pycache__/

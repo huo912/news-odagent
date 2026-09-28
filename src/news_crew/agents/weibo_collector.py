@@ -1,10 +1,11 @@
 """
 微博热搜采集员 Agent
 外倾性高，对热点敏感，擅长识别情绪化内容。
-使用搜索工具。
+使用搜索工具 + 网页抓取工具。
 """
 from crewai import Agent
 from ..tools.search_tool import web_search
+from ..tools.scrape_tool import web_scrape
 
 
 def create_weibo_collector(llm, cfg: dict) -> Agent:
@@ -13,7 +14,7 @@ def create_weibo_collector(llm, cfg: dict) -> Agent:
         role=cfg["role"],
         goal=cfg["goal"],
         backstory=cfg["backstory"],
-        tools=[web_search],
+        tools=[web_search, web_scrape],
         llm=llm,
         allow_delegation=cfg.get("allow_delegation", False),
         verbose=cfg.get("verbose", True),
