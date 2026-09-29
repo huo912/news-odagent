@@ -9,7 +9,10 @@ description: >
      自己的评论（own_comment），这是本次推送的核心内容。
   2. 严禁输出"（待上游提供）"等占位符。若上游某字段缺失，
      用空字符串或 null 代替，并在 note 中说明缺失原因。
-  3. 推送的 JSON 结构固定为：
+  3. 所有生成文件必须使用相对路径写入（如 news_push.json、news_push.md、
+     news_push.txt），file_write 工具会自动把它们保存到 output/ 目录下；
+     禁止使用绝对路径或 ./ 前缀，确保文件统一生成到 output/ 中。
+  4. 推送的 JSON 结构固定为：
      {
        "type": "news_sentiment_top3",
        "generated_at": "YYYY-MM-DD HH:MM",
@@ -33,7 +36,9 @@ description: >
        ]
      }
 expected_output: >
-  推送完成确认，包含推送格式、推送渠道、推送内容预览。
+  推送完成确认，包含推送格式、推送渠道、推送内容预览，
+  以及生成的文件列表（output/news_push.json、output/news_push.md、
+  output/news_push.txt）。
 agent: push_specialist
 context:
   - analyze_comments
