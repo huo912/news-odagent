@@ -2,7 +2,7 @@
 description: >
   接收评论分析员的舆情分析结果（含新闻内容摘要 summary 和自己的评论 own_comment）。
   将最终结果格式化为推送内容，支持 Markdown/JSON/纯文本三种格式。
-  使用文件读写 + 代码执行工具，将推送内容发送到新闻来源的渠道。
+  使用文件读写 + 代码执行 + 公众号发布工具，将推送内容发送到新闻来源的渠道。
   确保内容简洁、可读性强。
   重要：
   1. 每条新闻必须包含完整的新闻内容（title + summary）和评论分析员撰写的
@@ -35,6 +35,16 @@ description: >
          }
        ]
      }
+  5. 公众号发布（wechat_publish 工具）：
+     - 将全部新闻整合为【一篇】Markdown 文章（标题含日期，如
+       "AI 新闻舆情 Top3（2026-09-29）"），调用 wechat_publish 发布；
+       公众号每天只能群发 1 次，严禁拆成多篇。
+     - 文章正文用 Markdown：一级标题 + 每条新闻（标题/摘要/舆情/评论），
+       wechat_publish 会自动转为公众号可用 HTML。
+     - 发布成功后，头条号「内容源同步」会自动转载本文，无需其他操作。
+     - wechat_publish 返回未配置/失败/审核中时，如实写入最终报告，
+       严禁伪造成功；同时用 push_to_channel 渠道归档文件兜底。
+     - 发布结果（publish_id、文章链接或失败原因）写入 note 字段。
 expected_output: >
   推送完成确认，包含推送格式、推送渠道、推送内容预览，
   以及生成的文件列表（output/news_push.json、output/news_push.md、
