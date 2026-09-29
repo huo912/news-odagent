@@ -17,6 +17,37 @@ dependencies = [
 [project.optional-dependencies]
 # 启用 Nacos 远程模型配置时需要：pip install -e ".[nacos]"
 nacos = ["nacos-sdk-python>=1.0.0"]
+# 启用 kagent A2A 服务（方案 A：BYO Harness 部署）时需要。
+# 注意 1：kagent-crewai 要求 Python >=3.11,<3.14，与本项目
+#   requires-python (>=3.10,<3.13) 的交集为 3.11-3.12。
+# 注意 2：kagent-core 声明 opentelemetry-api<1.39.0，与 crewai>=1.15
+#   要求的 >=1.42 冲突（pip 无法解析）；且 otel instrumentation 生态
+#   在 PyPI 只有 0.xxb0 预发布版本。因此不能直接 pip install 本组，
+#   需按 README「kagent 部署」章节的步骤安装（--no-deps + --pre）。
+kagent = [
+    "kagent-crewai>=0.10.0",
+    "uvicorn>=0.20.0",
+    "fastapi>=0.100.0",
+    "google-genai>=1.21.1",
+    # otel base 包钉 1.42.1（kagent-core 实际需要 sdk._events，仅 1.42.x 有）
+    "opentelemetry-api==1.42.1",
+    "opentelemetry-sdk==1.42.1",
+    "opentelemetry-exporter-otlp-proto-grpc==1.42.1",
+    "opentelemetry-exporter-otlp-proto-http==1.42.1",
+    "opentelemetry-proto==1.42.1",
+    # instrumentation（PyPI 仅预发布，需 --pre）
+    "opentelemetry-instrumentation-fastapi>=0.52.0",
+    "opentelemetry-instrumentation-httpx>=0.52.0",
+    "opentelemetry-instrumentation-asgi>=0.52.0",
+    "opentelemetry-instrumentation>=0.52.0",
+    "opentelemetry-semantic-conventions>=0.52.0",
+    "opentelemetry-util-http>=0.52.0",
+    "opentelemetry-instrumentation-openai>=0.52.5",
+    "opentelemetry-instrumentation-anthropic>=0.52.5",
+    "opentelemetry-instrumentation-google-generativeai>=0.52.5",
+    "opentelemetry-instrumentation-crewai>=0.47.3",
+    "opentelemetry-semantic-conventions-ai>=0.5.1",
+]
 
 [project.scripts]
 news-crew = "news_crew.main:main"

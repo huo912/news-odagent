@@ -26,9 +26,13 @@ def python_execute(code: str) -> str:
         tmp_path = f.name
     try:
         result = subprocess.run(
-            [sys.executable, tmp_path],
+            # -X utf8: 强制子进程以 UTF-8 写 stdout/stderr（Windows 默认 GBK，
+            # 父进程 UTF-8 模式下解码会崩 _readerthread）
+            [sys.executable, "-X", "utf8", tmp_path],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         output = result.stdout

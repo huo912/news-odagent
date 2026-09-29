@@ -1,0 +1,64 @@
+# kagent BYO Harness（api.kagent.dev/v1alpha3）
+# 三大约束（CRD CEL 校验强制）：
+#   1. workload.image 必须用 sha256 digest 锁定（tag 会被拒绝）
+#   2. workload.command 必填（BYO harnesses must specify workload.command）
+#   3. substrate.workerPoolRef.name 与 substrate.snapshotPolicy.location 必填
+# 字段以实际安装的 kagent CRD 版本为准（kubectl get crd harnesses.api.kagent.dev -o yaml）
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: news-odagent
+  namespace: kagent
+spec:
+  # BYO 模式：镜像自带 kagent-crewai A2A 服务（私有 TaskStore + /readyz）
+  byo: {}
+  workload:
+    # 替换为 docker buildx imagetools inspect 取到的 digest
+    image: "your-registry/news-odagent@sha256:<64位hex>"
+    command: ["python", "-m", "news_crew.server"]
+    env:
+      - name: PORT
+        value: "8080"
+      - name: NACOS_REGISTER_ENABLED
+        value: "0"   # k8s 中禁用 Nacos 服务注册（Pod IP 无意义）
+      - name: OPENAI_API_KEY
+        credentialRef:
+          name: news-odagent-env
+          key: OPENAI_API_KEY
+      - name: OPENAI_API_BASE
+        credentialRef:
+          name: news-odagent-env
+          key: OPENAI_API_BASE
+      - name: OPENAI_MODEL_NAME
+        credentialRef:
+          name: news-odagent-env
+          key: OPENAI_MODEL_NAME
+      - name: TAVILY_API_KEY
+        credentialRef:
+          name: news-odagent-env
+          key: TAVILY_API_KEY
+      - name: ANYSEARCH_API_KEY
+        credentialRef:
+          name: news-odagent-env
+          key: ANYSEARCH_API_KEY
+      - name: NACOS_SERVER_ADDR
+        credentialRef:
+          name: news-odagent-env
+          key: NACOS_SERVER_ADDR
+      - name: NACOS_NAMESPACE
+        credentialRef:
+          name: news-odagent-env
+          key: NACOS_NAMESPACE
+      - name: NACOS_GROUP
+        credentialRef:
+          name: news-odagent-env
+          key: NACOS_GROUP
+      - name: NACOS_DATA_ID
+        credentialRef:
+          name: news-odagent-env
+          key: NACOS_DATA_ID
+  substrate:
+    workerPoolRef:
+      name: kagent-default   # kagent 默认 worker pool
+    snapshotPolicy:
+      location: "gs://your-bucket/kagent/"   # 必填，替换为真实 bucket

@@ -1,0 +1,12 @@
+{
+  "name": "news-odagent",
+  "description": "多 Agent 新闻采集、热度排序、舆情分析与推送团队",
+  "version": "0.1.0",
+  "url": "http://localhost:8080/",
+  "capabilities": {
+    "streaming": true
+  },
+  "skills": [],
+  "defaultInputModes": ["text"],
+  "defaultOutputModes": ["text"]
+}

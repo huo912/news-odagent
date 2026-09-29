@@ -40,6 +40,9 @@ ENV_SERVICE_GROUP = "NACOS_SERVICE_GROUP"
 ENV_SERVICE_IP = "NACOS_SERVICE_IP"
 ENV_SERVICE_PORT = "NACOS_SERVICE_PORT"
 ENV_TIMEOUT_MS = "NACOS_TIMEOUT_MS"
+# 注册开关：设为 0/false/no/off 时跳过服务注册（k8s/kagent 部署中
+# Pod IP 注册无意义，应禁用；配置中心热切换不受影响）
+ENV_REGISTER_ENABLED = "NACOS_REGISTER_ENABLED"
 
 DEFAULT_SERVICE_NAME = "news-odagent"
 DEFAULT_GROUP = "DEFAULT_GROUP"
@@ -168,6 +171,12 @@ def register_service() -> None:
         if _started:
             return
         _started = True
+
+    if os.getenv(ENV_REGISTER_ENABLED, "").strip().lower() in (
+        "0", "false", "no", "off",
+    ):
+        logger.debug("%s 已禁用，跳过服务注册", ENV_REGISTER_ENABLED)
+        return
 
     if not os.getenv(ENV_SERVER_ADDR, "").strip():
         logger.debug("未配置 %s，跳过服务注册", ENV_SERVER_ADDR)

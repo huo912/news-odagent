@@ -309,3 +309,95 @@ NACOS_SERVICE_PORT=8000            # 注册端口（批处理任务无监听端�
   ]
 }
 ```
+
+## kagent 部署（方案 A：BYO Harness，可选）
+
+把 Crew 包装成 kagent 兼容的 **A2A 服务**部署到 k8s：每收到一条 A2A
+消息即触发一次完整的新闻采集/处理/推送流水线。
+
+### 原理
+
+`src/news_crew/server.py` 用 `kagent-crewai` 的 `KAgentApp` 包装
+`build_crew()`，构建 FastAPI 应用（A2A JSONRPC 路由 + `/health` +
+`/thread_dump`），由 uvicorn 提供服务。镜像内自带 kagent 私有
+TaskStore，满足 BYO Harness 契约。
+
+### 本地运行
+
+```bash
+# 1. 安装 kagent 依赖（要求 Python 3.11-3.12）。
+#    注意：kagent-core 声明 opentelemetry-api<1.39.0 与 crewai>=1.15
+#    要求的 >=1.42 冲突，pip 无法直接解析，需分两步：
+pip install --pre \
+    "opentelemetry-instrumentation-fastapi==0.66b0" \
+    "opentelemetry-instrumentation-httpx==0.66b0" \
+    "opentelemetry-instrumentation-asgi==0.66b0" \
+    "opentelemetry-instrumentation==0.66b0" \
+    "opentelemetry-semantic-conventions==0.66b0" \
+    "opentelemetry-util-http==0.66b0" \
+    "opentelemetry-instrumentation-openai==0.62.3" \
+    "opentelemetry-instrumentation-anthropic==0.62.3" \
+    "opentelemetry-instrumentation-google-generativeai==0.62.3" \
+    "opentelemetry-instrumentation-crewai==0.62.3" \
+    "opentelemetry-semantic-conventions-ai==0.5.1"
+pip install "opentelemetry-api==1.42.1" "opentelemetry-sdk==1.42.1" \
+    "opentelemetry-exporter-otlp-proto-grpc==1.42.1" \
+    "opentelemetry-exporter-otlp-proto-http==1.42.1" \
+    "opentelemetry-proto==1.42.1"
+pip install --no-deps "kagent-core==0.10.2" "kagent-crewai==0.10.2"
+pip install "fastapi>=0.100.0" "google-genai>=1.21.1" "uvicorn>=0.20.0"
+
+# 2. 设置本地开发环境变量（kagent-core 在 import 时读取）
+export KAGENT_URL=http://localhost:8083
+export KAGENT_NAME=news-odagent
+export KAGENT_NAMESPACE=default
+
+# 3. 启动
+python -X utf8 -m news_crew.server
+# 健康检查
+curl http://localhost:8080/health
+# 触发一次流水线（A2A message/send，messageId 必填）
+curl -X POST http://localhost:8080/ -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"msg-001","parts":[{"kind":"text","text":"trigger"}]}}}'
+```
+
+### 部署到 k8s（kagent BYO Harness）
+
+```bash
+# 1. 构建并推送镜像，取 sha256 digest（CRD 强制 digest 锁定，tag 会被拒绝）
+docker build -t <registry>/news-odagent:0.1.0 .
+docker push <registry>/news-odagent:0.1.0
+docker buildx imagetools inspect <registry>/news-odagent:0.1.0
+
+# 2. 编辑 deploy/kagent/ 下的 manifests：
+#    - secret.yaml：填入 LLM 网关 / Nacos 真实配置
+#    - harness.yaml：workload.image 填上一步取到的 sha256 digest；
+#      substrate.snapshotPolicy.location 替换为真实 bucket
+#    - agenttemplate.yaml / agent.yaml：一般无需修改
+
+# 3. 依次应用
+kubectl apply -f deploy/kagent/secret.yaml
+kubectl apply -f deploy/kagent/harness.yaml
+kubectl apply -f deploy/kagent/agenttemplate.yaml
+kubectl apply -f deploy/kagent/agent.yaml
+```
+
+### 注意事项
+
+- **BYO Harness 三大约束**（CRD CEL 校验强制）：`workload.image` 必须
+  sha256 digest 锁定；`workload.command` 必填；`substrate.workerPoolRef`
+  与 `substrate.snapshotPolicy.location` 必填。
+- **KAGENT_URL / KAGENT_NAME / KAGENT_NAMESPACE** 由 Harness 编译器
+  自动注入，无需配置在 Secret 中。
+- **兼容性**：crewai 1.15.22 移除了 `crewai.memory.LongTermMemory`，
+  `server.py` 在 import kagent 前注入轻量 shim（本项目 memory=False，
+  该类不会被真正使用）。
+- **Nacos 服务注册在 k8s 中禁用**（`NACOS_REGISTER_ENABLED=0`，Pod IP
+  注册无意义）；Nacos **配置中心的模型热切换不受影响**，仍可用。
+- **输出文件**（`output/news_push.json/md/txt`）写在容器内 `/app/output`，
+  为 ephemeral；持久化需挂 PVC，或依赖 A2A 响应返回推送结果。
+- **A2A 输入**：本项目任务描述无 `{input}` 占位符，A2A 消息文本不参与
+  任务输入，每条消息等价于触发一次完整流水线。
+- 集群需可达 LLM 网关（`OPENAI_API_BASE`）与 Nacos（`NACOS_SERVER_ADDR`）。
+- manifests 字段以实际安装的 kagent CRD 版本为准
+  （`kubectl get crd harnesses.api.kagent.dev -o yaml`）。

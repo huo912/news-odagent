@@ -24,11 +24,20 @@ def web_scrape(url: str) -> str:
     try:
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        # 修复中文乱码：requests 在响应头无 charset 时默认按 ISO-8859-1 解码，
+        # 导致 UTF-8 中文变成 "ãåäº..." 乱码。
+        # 方案：把原始字节交给 BeautifulSoup，由其根据 HTML meta/字节特征自动识别编码。
+        soup = BeautifulSoup(resp.content, "html.parser")
         # 移除脚本和样式
         for tag in soup(["script", "style", "noscript"]):
             tag.decompose()
         text = soup.get_text(separator="\n", strip=True)
+        # 兜底：若自动识别仍失败（极少见），按 UTF-8 强制解码
+        if text and text.count("\ufffd") > len(text) * 0.1:
+            soup2 = BeautifulSoup(resp.content.decode("utf-8", errors="ignore"), "html.parser")
+            for tag in soup2(["script", "style", "noscript"]):
+                tag.decompose()
+            text = soup2.get_text(separator="\n", strip=True)
         # 限制长度避免超出上下文
         return text[:8000]
     except Exception as e:

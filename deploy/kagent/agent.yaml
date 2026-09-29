@@ -1,0 +1,15 @@
+# Agent（api.kagent.dev/v1alpha3）
+# template/templateRef 与 harness/harnessRef 必须各恰好一个
+apiVersion: api.kagent.dev/v1alpha3
+kind: Agent
+metadata:
+  name: news-odagent
+  namespace: kagent
+spec:
+  description: 多 Agent 新闻采集、热度排序、舆情分析与推送团队
+  templateRef:
+    name: news-odagent
+    namespace: kagent
+  harnessRef:
+    name: news-odagent
+    namespace: kagent

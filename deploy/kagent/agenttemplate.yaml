@@ -1,0 +1,10 @@
+# AgentTemplate（api.kagent.dev/v1alpha3）
+# BYO 镜像允许省略 modelConfig（模型由镜像内 .env/Nacos 配置决定）
+apiVersion: api.kagent.dev/v1alpha3
+kind: AgentTemplate
+metadata:
+  name: news-odagent
+  namespace: kagent
+spec:
+  description: 多 Agent 新闻采集、热度排序、舆情分析与推送团队
+  # BYO 模式无需 modelConfig
