@@ -66,7 +66,7 @@ news-odagent/
 │   │   ├── scrape_tool.py   # 网页抓取
 │   │   ├── python_tool.py   # Python 代码执行
 │   │   ├── sentiment_tool.py# 情感分析
-│   │   ├── wechat_tool.py   # 公众号发布（头条号内容源同步）
+│   │   ├── toutiao_tool.py  # 头条号发布（Playwright 自动化）
 │   │   └── file_tool.py     # 文件读写/推送
 │   ├── crew.py              # Crew 编排（加载 YAML）
 │   ├── dynamic_llm.py       # 运行中热切换模型的 LLM 包装器
@@ -276,7 +276,7 @@ NACOS_SERVICE_PORT=8000            # 注册端口（批处理任务无监听端�
 | 内容整合员     | Python 执行                  | 尽责性极高，数据清洗 |
 | 热度排序员     | Python 执行+计算             | 神经质高，严谨排序   |
 | 评论分析员     | 搜索+情感分析                | 宜人性高，客观中立   |
-| 推送专员       | 文件读写+代码执行+公众号发布 | 外倾性高，简洁表达   |
+| 推送专员       | 文件读写+代码执行+头条号发布 | 外倾性高，简洁表达   |
 
 ## 输出
 
@@ -311,52 +311,50 @@ NACOS_SERVICE_PORT=8000            # 注册端口（批处理任务无监听端�
 }
 ```
 
-## 推送到头条号（内容源同步）
+## 推送到头条号（Playwright 自动化）
 
-头条号（mp.toutiao.com）**没有面向普通创作者的公开发布 API**，本项目采用
-官方支持的「**内容源同步**」链路实现全自动发布：
+头条号（mp.toutiao.com）**没有面向普通创作者的公开发布 API**（文章 API
+仅限政务/媒体/机构主体），本项目采用 **Playwright 浏览器自动化**直接操作
+头条号创作者后台的图文发布页，模拟人工输入标题/正文并点击发布：
 
 ```
-push_specialist --wechat_publish--> 微信公众号（草稿箱+发布 API）
-                    --内容源同步(官方, 自动)--> 头条号
+push_specialist --toutiao_publish--> 头条号后台（Playwright 驱动 Chromium）
 ```
 
 ### 一次性配置
 
-1. **头条号侧**：mp.toutiao.com → 设置 → 内容源同步 → 绑定你的微信公众号
-   （头条号需完成实名认证）。此后公众号已发表的文章会自动同步到头条号。
-2. **公众号侧**（要求**已认证**的订阅号/服务号，未认证个人订阅号无
-   草稿/发布 API 权限，调用返回 48001）：
-   - 公众号后台「设置与开发 → 基本配置」记录 `AppID` / `AppSecret`；
-   - 同页「IP 白名单」加入运行机出口 IP（报错 40164 的 errmsg 会带实际 IP）；
-   - 上传一张封面图（公众号文章必须有封面）：
-     ```bash
-     python -m news_crew.tools.wechat_tool upload-cover cover.jpg
-     # 输出 media_id，填入 .env 的 WECHAT_THUMB_MEDIA_ID
-     ```
+1. **安装依赖**（可选组，不影响其他功能）：
+   ```bash
+   pip install -e ".[toutiao]"
+   playwright install chromium
+   ```
+2. **登录**（打开浏览器，扫码或手机号验证码均可；检测到登录成功后自动
+   保存会话到 `.toutiao/state.json` 并关闭浏览器，已 gitignore，之后
+   自动复用；会话过期重新执行即可）：
+   ```bash
+   python -m news_crew.tools.toutiao_tool login
+   # 自检登录态
+   python -m news_crew.tools.toutiao_tool check
+   ```
 3. **`.env` 配置**：
    ```bash
-   WECHAT_APPID=wx_xxx
-   WECHAT_SECRET=xxx
-   WECHAT_THUMB_MEDIA_ID=xxx        # 或 WECHAT_THUMB_IMAGE_PATH=cover.jpg
-   # WECHAT_AUTHOR=news-odagent      # 可选，文章作者名
-   ```
-4. **自检**：
-   ```bash
-   python -m news_crew.tools.wechat_tool check
-   # access_token 获取成功: xxx...
+   TOUTIAO_PUBLISH_ENABLED=1
+   # TOUTIAO_HEADLESS=0        # 可选，1=无头模式
+   # TOUTIAO_STATE_PATH=       # 可选，会话文件路径
    ```
 
 ### 运行行为
 
-- 推送专员把全部新闻整合为**一篇** Markdown 文章（标题含日期），调用
-  `wechat_publish` 工具：草稿箱 `draft/add` → 发布 `freepublish/submit` →
-  轮询发布状态，成功后返回文章链接；Markdown 自动转为公众号可用 HTML。
-- 公众号**每天只能群发 1 次**，对"每日新闻推送"场景刚好够用；
-  发布提交后审核中属正常状态，勿重复提交。
-- 头条号同步通常几分钟到 1 小时内完成，以公众号"已发表"为准。
-- 未配置 `WECHAT_APPID/WECHAT_SECRET` 或发布失败时，工具返回明确原因，
-  推送专员如实报告并回退 `push_to_channel` 文件渠道，**绝不伪造成功**。
+- 推送专员把全部新闻整合为**一篇** Markdown 文章（标题含日期、长度
+  ≤30：中文计 1、英文数字计 0.5），调用 `toutiao_publish` 工具：打开发布页
+  → 填入标题 → Markdown 转富文本写入 ProseMirror 编辑器 → 校验写入 →
+  点击「预览并发布」→ 自动处理二次确认弹窗 → 轮询发布结果。
+- 工具内置多级兜底：选择器多候选回退、ProseMirror view API →
+  execCommand → 模拟粘贴 → 纯文本写入；标题/正文写入后强制验证非空。
+- 未启用 / 未登录 / 发布失败 / 结果未知时，工具返回明确原因，推送专员
+  如实报告并回退 `push_to_channel` 文件渠道，**绝不伪造成功**。
+- 头条页面改版可能导致选择器失效，工具会返回「页面结构可能已改版」，
+  需人工更新 `toutiao_tool.py` 中的选择器常量。
 
 ## kagent 部署（方案 A：BYO Harness，可选）
 

@@ -7,4 +7,7 @@ src/news_crew/__pycache__/
 output/
 src/news_crew/agents/__pycache__/
 .env
+# 头条号 Playwright 登录会话（含 cookie，严禁入库）
+.toutiao/
 src/news_crew/tools/__pycache__/
+tests/__pycache__/

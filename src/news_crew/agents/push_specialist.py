@@ -1,13 +1,12 @@
 """
 新闻推送专员 Agent
 外倾性高，擅长简洁表达，注重可读性。
-使用文件读写 + 代码执行 + 公众号发布工具
-（公众号发表后经头条号「内容源同步」自动同步到头条）。
+使用文件读写 + 代码执行 + 头条号发布工具（Playwright 自动化）。
 """
 from crewai import Agent
 from ..tools.file_tool import file_write, file_read, push_to_channel
 from ..tools.python_tool import python_execute
-from ..tools.wechat_tool import wechat_publish
+from ..tools.toutiao_tool import toutiao_publish
 
 
 def create_push_specialist(llm, cfg: dict) -> Agent:
@@ -16,7 +15,7 @@ def create_push_specialist(llm, cfg: dict) -> Agent:
         role=cfg["role"],
         goal=cfg["goal"],
         backstory=cfg["backstory"],
-        tools=[file_write, file_read, push_to_channel, python_execute, wechat_publish],
+        tools=[file_write, file_read, push_to_channel, python_execute, toutiao_publish],
         llm=llm,
         allow_delegation=cfg.get("allow_delegation", False),
         verbose=cfg.get("verbose", True),

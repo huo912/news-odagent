@@ -13,6 +13,29 @@ Requires-Dist: python-dotenv>=1.0.0
 Requires-Dist: textblob>=0.17.1
 Provides-Extra: nacos
 Requires-Dist: nacos-sdk-python>=1.0.0; extra == "nacos"
+Provides-Extra: toutiao
+Requires-Dist: playwright>=1.40.0; extra == "toutiao"
+Provides-Extra: kagent
+Requires-Dist: kagent-crewai>=0.10.0; extra == "kagent"
+Requires-Dist: uvicorn>=0.20.0; extra == "kagent"
+Requires-Dist: fastapi>=0.100.0; extra == "kagent"
+Requires-Dist: google-genai>=1.21.1; extra == "kagent"
+Requires-Dist: opentelemetry-api==1.42.1; extra == "kagent"
+Requires-Dist: opentelemetry-sdk==1.42.1; extra == "kagent"
+Requires-Dist: opentelemetry-exporter-otlp-proto-grpc==1.42.1; extra == "kagent"
+Requires-Dist: opentelemetry-exporter-otlp-proto-http==1.42.1; extra == "kagent"
+Requires-Dist: opentelemetry-proto==1.42.1; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-fastapi>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-httpx>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-asgi>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-semantic-conventions>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-util-http>=0.52.0; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-openai>=0.52.5; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-anthropic>=0.52.5; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-google-generativeai>=0.52.5; extra == "kagent"
+Requires-Dist: opentelemetry-instrumentation-crewai>=0.47.3; extra == "kagent"
+Requires-Dist: opentelemetry-semantic-conventions-ai>=0.5.1; extra == "kagent"
 
 # 新闻团队（News Crew）
 
@@ -82,9 +105,12 @@ news-odagent/
 │   │   ├── scrape_tool.py   # 网页抓取
 │   │   ├── python_tool.py   # Python 代码执行
 │   │   ├── sentiment_tool.py# 情感分析
+│   │   ├── toutiao_tool.py  # 头条号发布（Playwright 自动化）
 │   │   └── file_tool.py     # 文件读写/推送
 │   ├── crew.py              # Crew 编排（加载 YAML）
+│   ├── dynamic_llm.py       # 运行中热切换模型的 LLM 包装器
 │   ├── nacos_config.py      # Nacos 远程模型配置（可选）
+│   ├── nacos_registry.py    # Nacos 服务注册（可选）
 │   └── main.py              # 入口
 ├── .env.example
 ├── pyproject.toml
@@ -146,15 +172,20 @@ python -m news_crew.main --list-agents
 | `--agents toutiao_collector content_integrator heat_ranker` | 今日头条采集 → 内容整合 → 热度排序（微博/知乎采集被跳过，整合任务的 context 自动裁剪） |
 | `--agents heat_ranker`                                      | 报错：上游采集/整合 agent 未启动，无可执行任务                                         |
 
-## 断点续跑（Checkpoint）与跨会话记忆（Memory）
+## 断点续跑（Checkpoint）
 
-所有 agent 和 Crew 均已启用 `checkpoint=True` 和 `memory=True`：
+Crew 已启用 `checkpoint=True`：
 
 - **Checkpoint 断点续跑**：每个任务完成后，Crew 运行时状态（含各任务输出）
   自动保存到 `./.checkpoints/main/{时间戳}_{id}.json`。运行中断（网络异常、
   手动 Ctrl+C 等）后可从断点恢复，**已完成的任务不会重跑**。
-- **Memory 跨会话记忆**：上下文保存到 `.crewai/`（LanceDB 向量存储），
-  跨会话保持记忆。
+
+> **关于 Memory（跨会话记忆）**：当前已关闭（`memory=False`）。
+> CrewAI 的 memory 依赖 embedding 模型（默认 `text-embedding-3-large`），
+> 而当前 LLM 网关不提供 embedding 服务，开启会导致 `search_memory`
+> 工具报 400 错误。若后续网关支持 embedding，可在 `crew.py` 中改回
+> `memory=True`，并通过 `EMBEDDER_MODEL` / `EMBEDDER_BASE_URL` 环境变量
+> 指定可用的 embedding 模型。
 
 ### 用法
 
@@ -185,7 +216,7 @@ result = crew.kickoff()   # 从最后一个已完成的任务之后继续
 - 需要先**正常运行一次**产生 checkpoint 后才能续跑（`--list-checkpoints`
   可查看是否已有 checkpoint）。
 - 恢复时 agent 配置（YAML）最好与保存时一致，否则可能出现任务对不上的情况。
-- `.checkpoints/` 和 `.crewai/` 是运行时状态目录，建议加入 `.gitignore`。
+- `.checkpoints/` 是运行时状态目录，建议加入 `.gitignore`。
 
 ## 远程模型配置（Nacos，可选）
 
@@ -237,25 +268,54 @@ agents:
 
 说明：
 
-- **热更新**：首次拉取后，后台线程持续监听 Nacos 配置变更。在 Nacos
-  控制台修改配置并发布后，进程内缓存自动刷新，**下一次创建 agent LLM
-  时即使用新模型，无需重启进程**（已运行的 agent 保持原模型，直到
-  其任务结束、Crew 重新构建）。
+- **热更新（运行中热切换）**：首次拉取后，后台线程持续监听 Nacos 配置变更。
+  在 Nacos 控制台修改配置并发布后，进程内缓存自动刷新。Agent 通过
+  `DynamicLLM` 包装器（`src/news_crew/dynamic_llm.py`）在**每次调用 LLM 前**
+  重新读取 Nacos 最新配置，配置有变化时重建底层 LLM，因此**运行中的 agent
+  也会立即切换到新模型，无需重启进程、无需等待任务结束**。
 - 首次拉取失败（网络异常、配置格式错误等）会打印警告并自动回退到本地
   配置，不阻断启动；后续配置变更仍会尝试热更新。
 - 未设置 `NACOS_SERVER_ADDR` 时不会连接 Nacos，也无需安装 SDK。
 
+## 服务注册（Nacos，可选）
+
+进程启动时会把自身作为**临时实例**注册到 Nacos **注册中心**，可在 Nacos
+控制台「服务管理 → 服务列表」中看到本服务；进程退出时自动注销。
+未配置 `NACOS_SERVER_ADDR` 时静默跳过，不影响运行。
+
+服务注册与上面的远程模型配置**共用同一套连接参数**（server addr /
+namespace / username / password），配置好远程模型即自动启用服务注册。
+
+### 相关环境变量
+
+```bash
+NACOS_SERVICE_NAME=news-odagent    # 注册的服务名（默认 news-odagent）
+NACOS_SERVICE_GROUP=DEFAULT_GROUP  # 服务分组（默认 DEFAULT_GROUP）
+NACOS_SERVICE_IP=                  # 注册 IP，留空自动探测本机出口 IP
+NACOS_SERVICE_PORT=8000            # 注册端口（批处理任务无监听端口，
+                                   # 仅作实例标识，可在控制台查看）
+```
+
+### 说明
+
+- 采用 **临时实例（ephemeral=true）**，由 SDK 的 gRPC 长连接维持心跳，
+  实例在控制台显示为健康；进程退出时通过 `atexit` 显式注销，即使未
+  显式注销，长连接断开后 Nacos 也会自动摘除该实例。
+- 注册在独立守护线程中完成，**非阻塞**，不拖慢任务启动；注册失败仅打印
+  警告，不影响 Crew 运行。
+- 实例 metadata 携带 `app=news-odagent`、`framework=crewai`，便于识别。
+
 ## 各 Agent 说明
 
-| Agent          | 工具              | 性格背景             |
-| -------------- | ----------------- | -------------------- |
-| 今日头条采集员 | 搜索+网页抓取     | 外倾性高，热点敏感   |
-| 微博热搜采集员 | 搜索              | 外倾性高，热点敏感   |
-| 知乎热榜采集员 | 搜索              | 开放性高，深度讨论   |
-| 内容整合员     | Python 执行       | 尽责性极高，数据清洗 |
-| 热度排序员     | Python 执行+计算  | 神经质高，严谨排序   |
-| 评论分析员     | 搜索+情感分析     | 宜人性高，客观中立   |
-| 推送专员       | 文件读写+代码执行 | 外倾性高，简洁表达   |
+| Agent          | 工具                         | 性格背景             |
+| -------------- | ---------------------------- | -------------------- |
+| 今日头条采集员 | 搜索+网页抓取                | 外倾性高，热点敏感   |
+| 微博热搜采集员 | 搜索                         | 外倾性高，热点敏感   |
+| 知乎热榜采集员 | 搜索                         | 开放性高，深度讨论   |
+| 内容整合员     | Python 执行                  | 尽责性极高，数据清洗 |
+| 热度排序员     | Python 执行+计算             | 神经质高，严谨排序   |
+| 评论分析员     | 搜索+情感分析                | 宜人性高，客观中立   |
+| 推送专员       | 文件读写+代码执行+头条号发布 | 外倾性高，简洁表达   |
 
 ## 输出
 
@@ -289,3 +349,139 @@ agents:
   ]
 }
 ```
+
+## 推送到头条号（Playwright 自动化）
+
+头条号（mp.toutiao.com）**没有面向普通创作者的公开发布 API**（文章 API
+仅限政务/媒体/机构主体），本项目采用 **Playwright 浏览器自动化**直接操作
+头条号创作者后台的图文发布页，模拟人工输入标题/正文并点击发布：
+
+```
+push_specialist --toutiao_publish--> 头条号后台（Playwright 驱动 Chromium）
+```
+
+### 一次性配置
+
+1. **安装依赖**（可选组，不影响其他功能）：
+   ```bash
+   pip install -e ".[toutiao]"
+   playwright install chromium
+   ```
+2. **扫码登录**（打开浏览器，扫码后自动保存会话到 `.toutiao/state.json`，
+   已 gitignore，之后自动复用；会话过期重新执行即可）：
+   ```bash
+   python -m news_crew.tools.toutiao_tool login
+   # 自检登录态
+   python -m news_crew.tools.toutiao_tool check
+   ```
+3. **`.env` 配置**：
+   ```bash
+   TOUTIAO_PUBLISH_ENABLED=1
+   # TOUTIAO_HEADLESS=0        # 可选，1=无头模式
+   # TOUTIAO_STATE_PATH=       # 可选，会话文件路径
+   ```
+
+### 运行行为
+
+- 推送专员把全部新闻整合为**一篇** Markdown 文章（标题含日期、长度
+  ≤30：中文计 1、英文数字计 0.5），调用 `toutiao_publish` 工具：打开发布页
+  → 填入标题 → Markdown 转富文本写入 ProseMirror 编辑器 → 校验写入 →
+  点击「预览并发布」→ 自动处理二次确认弹窗 → 轮询发布结果。
+- 工具内置多级兜底：选择器多候选回退、ProseMirror view API →
+  execCommand → 模拟粘贴 → 纯文本写入；标题/正文写入后强制验证非空。
+- 未启用 / 未登录 / 发布失败 / 结果未知时，工具返回明确原因，推送专员
+  如实报告并回退 `push_to_channel` 文件渠道，**绝不伪造成功**。
+- 头条页面改版可能导致选择器失效，工具会返回「页面结构可能已改版」，
+  需人工更新 `toutiao_tool.py` 中的选择器常量。
+
+## kagent 部署（方案 A：BYO Harness，可选）
+
+把 Crew 包装成 kagent 兼容的 **A2A 服务**部署到 k8s：每收到一条 A2A
+消息即触发一次完整的新闻采集/处理/推送流水线。
+
+### 原理
+
+`src/news_crew/server.py` 用 `kagent-crewai` 的 `KAgentApp` 包装
+`build_crew()`，构建 FastAPI 应用（A2A JSONRPC 路由 + `/health` +
+`/thread_dump`），由 uvicorn 提供服务。镜像内自带 kagent 私有
+TaskStore，满足 BYO Harness 契约。
+
+### 本地运行
+
+```bash
+# 1. 安装 kagent 依赖（要求 Python 3.11-3.12）。
+#    注意：kagent-core 声明 opentelemetry-api<1.39.0 与 crewai>=1.15
+#    要求的 >=1.42 冲突，pip 无法直接解析，需分两步：
+pip install --pre \
+    "opentelemetry-instrumentation-fastapi==0.66b0" \
+    "opentelemetry-instrumentation-httpx==0.66b0" \
+    "opentelemetry-instrumentation-asgi==0.66b0" \
+    "opentelemetry-instrumentation==0.66b0" \
+    "opentelemetry-semantic-conventions==0.66b0" \
+    "opentelemetry-util-http==0.66b0" \
+    "opentelemetry-instrumentation-openai==0.62.3" \
+    "opentelemetry-instrumentation-anthropic==0.62.3" \
+    "opentelemetry-instrumentation-google-generativeai==0.62.3" \
+    "opentelemetry-instrumentation-crewai==0.62.3" \
+    "opentelemetry-semantic-conventions-ai==0.5.1"
+pip install "opentelemetry-api==1.42.1" "opentelemetry-sdk==1.42.1" \
+    "opentelemetry-exporter-otlp-proto-grpc==1.42.1" \
+    "opentelemetry-exporter-otlp-proto-http==1.42.1" \
+    "opentelemetry-proto==1.42.1"
+pip install --no-deps "kagent-core==0.10.2" "kagent-crewai==0.10.2"
+pip install "fastapi>=0.100.0" "google-genai>=1.21.1" "uvicorn>=0.20.0"
+
+# 2. 设置本地开发环境变量（kagent-core 在 import 时读取）
+export KAGENT_URL=http://localhost:8083
+export KAGENT_NAME=news-odagent
+export KAGENT_NAMESPACE=default
+
+# 3. 启动
+python -X utf8 -m news_crew.server
+# 健康检查
+curl http://localhost:8080/health
+# 触发一次流水线（A2A message/send，messageId 必填）
+curl -X POST http://localhost:8080/ -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"msg-001","parts":[{"kind":"text","text":"trigger"}]}}}'
+```
+
+### 部署到 k8s（kagent BYO Harness）
+
+```bash
+# 1. 构建并推送镜像，取 sha256 digest（CRD 强制 digest 锁定，tag 会被拒绝）
+docker build -t <registry>/news-odagent:0.1.0 .
+docker push <registry>/news-odagent:0.1.0
+docker buildx imagetools inspect <registry>/news-odagent:0.1.0
+
+# 2. 编辑 deploy/kagent/ 下的 manifests：
+#    - secret.yaml：填入 LLM 网关 / Nacos 真实配置
+#    - harness.yaml：workload.image 填上一步取到的 sha256 digest；
+#      substrate.snapshotPolicy.location 替换为真实 bucket
+#    - agenttemplate.yaml / agent.yaml：一般无需修改
+
+# 3. 依次应用
+kubectl apply -f deploy/kagent/secret.yaml
+kubectl apply -f deploy/kagent/harness.yaml
+kubectl apply -f deploy/kagent/agenttemplate.yaml
+kubectl apply -f deploy/kagent/agent.yaml
+```
+
+### 注意事项
+
+- **BYO Harness 三大约束**（CRD CEL 校验强制）：`workload.image` 必须
+  sha256 digest 锁定；`workload.command` 必填；`substrate.workerPoolRef`
+  与 `substrate.snapshotPolicy.location` 必填。
+- **KAGENT_URL / KAGENT_NAME / KAGENT_NAMESPACE** 由 Harness 编译器
+  自动注入，无需配置在 Secret 中。
+- **兼容性**：crewai 1.15.22 移除了 `crewai.memory.LongTermMemory`，
+  `server.py` 在 import kagent 前注入轻量 shim（本项目 memory=False，
+  该类不会被真正使用）。
+- **Nacos 服务注册在 k8s 中禁用**（`NACOS_REGISTER_ENABLED=0`，Pod IP
+  注册无意义）；Nacos **配置中心的模型热切换不受影响**，仍可用。
+- **输出文件**（`output/news_push.json/md/txt`）写在容器内 `/app/output`，
+  为 ephemeral；持久化需挂 PVC，或依赖 A2A 响应返回推送结果。
+- **A2A 输入**：本项目任务描述无 `{input}` 占位符，A2A 消息文本不参与
+  任务输入，每条消息等价于触发一次完整流水线。
+- 集群需可达 LLM 网关（`OPENAI_API_BASE`）与 Nacos（`NACOS_SERVER_ADDR`）。
+- manifests 字段以实际安装的 kagent CRD 版本为准
+  （`kubectl get crd harnesses.api.kagent.dev -o yaml`）。

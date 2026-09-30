@@ -17,6 +17,10 @@ dependencies = [
 [project.optional-dependencies]
 # 启用 Nacos 远程模型配置时需要：pip install -e ".[nacos]"
 nacos = ["nacos-sdk-python>=1.0.0"]
+# 启用头条号 Playwright 自动发布时需要：
+#   pip install -e ".[toutiao]" && playwright install chromium
+#   首次使用先登录（扫码或手机号均可）：python -m news_crew.tools.toutiao_tool login
+toutiao = ["playwright>=1.40.0"]
 # 启用 kagent A2A 服务（方案 A：BYO Harness 部署）时需要。
 # 注意 1：kagent-crewai 要求 Python >=3.11,<3.14，与本项目
 #   requires-python (>=3.10,<3.13) 的交集为 3.11-3.12。

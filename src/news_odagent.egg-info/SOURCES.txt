@@ -2,8 +2,11 @@ README.md
 pyproject.toml
 src/news_crew/__init__.py
 src/news_crew/crew.py
+src/news_crew/dynamic_llm.py
 src/news_crew/main.py
 src/news_crew/nacos_config.py
+src/news_crew/nacos_registry.py
+src/news_crew/server.py
 src/news_crew/agents/__init__.py
 src/news_crew/agents/comment_analyst.py
 src/news_crew/agents/content_integrator.py
@@ -19,6 +22,7 @@ src/news_crew/tools/python_tool.py
 src/news_crew/tools/scrape_tool.py
 src/news_crew/tools/search_tool.py
 src/news_crew/tools/sentiment_tool.py
+src/news_crew/tools/toutiao_tool.py
 src/news_odagent.egg-info/PKG-INFO
 src/news_odagent.egg-info/SOURCES.txt
 src/news_odagent.egg-info/dependency_links.txt
